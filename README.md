@@ -1,80 +1,81 @@
-# PulsePay
+# PulsePay ⚡
 
-Real-time streaming payment platform for per-second billing of services like gyms, EV charging, WiFi, and parking.
+PulsePay is a **Real-Time Streaming Payment Platform** that enables per-second billing for physical and digital services. Powered by **Superfluid**, PulsePay brings the concept of continuous money streams to everyday businesses like gyms, EV charging stations, parking lots, and co-working spaces. 
 
-## Features
+Instead of pre-paying or relying on discrete transaction checkpoints, users "stream" payments automatically for the precise duration they consume a service.
 
-- **Real-time Streaming Payments**: Per-second billing with Superfluid integration
-- **Multi-tenant**: Support for multiple store types (GYM, EV, WIFI, PARKING)
-- **Wallet System**: User and store wallets with balance tracking
-- **Session Management**: Start, bill, and end streaming sessions
-- **QR Code Services**: Scan-to-start service sessions
-- **User-Store Tracking**: Track which stores users have visited via `storeIds`
+## 🚀 Key Features
 
-## Tech Stack
+- **Continuous Per-Second Billing**: Users pay exactly for what they use down to the second using Superfluid continuous streams.
+- **Service Agnostic Architecture**: Built to handle multiple merchant/store types out of the box (e.g., `GYM`, `EV`, `WIFI`, `PARKING`).
+- **Scan-to-Start Integration**: Users can simply scan a merchant's QR Code to initiate a service session and start streaming funds instantly.
+- **Dual Wallet System**: Complete abstraction with in-app dual-wallet configurations for both User accounts (payers) and Store accounts (receivers).
+- **Session Management**: Full lifecycle management of streaming parameters (start, bill, pause, end) tied directly to a continuous `StreamSession`.
+- **User-Merchant History**: Transparent tracking of users and the stores they frequent, allowing for loyalty building and analytics.
 
-- **Backend**: Node.js, Express.js
-- **Database**: MongoDB with Mongoose
-- **Blockchain**: Superfluid Protocol (optional crypto streaming)
-- **Documentation**: Swagger/OpenAPI
+## 🛠 Tech Stack
 
-## Quick Start
+- **Backend**: Node.js & Express.js
+- **Database**: MongoDB with Mongoose (Document-based relational mapping)
+- **Blockchain integration**: Superfluid Protocol (via `@superfluid-finance/sdk-core` and `ethers`)
+- **API Documentation**: Swagger/OpenAPI (`swagger-ui-express`)
+- **Authentication/Security**: JWT (assumed via standard practices) & Express Validator
+
+## 📁 System Architecture
+
+The ecosystem relies on several core entities:
+* **Users**: Can top up their wallets and start streaming payments for services.
+* **Stores**: Independent merchants offering continuous services via unique `Service` profiles.
+* **Wallets & Ledgers**: Internal tracking mapping physical/fiat balances alongside Web3 EVM addresses logic for genuine crypto streams.
+* **Stream Sessions**: The active real-time connection bridging the User's wallet, the Store's wallet, and the given Service's rate-per-second requirement.
+
+For a deep dive into our Database schema, consult the [Schema Relations](./Schema_Relation.md).
+
+## ⚡ Quick Start
+
+### Prerequisites
+- Node.js (v18+)
+- MongoDB running locally or via MongoDB Atlas
+- Web3 Provider / RPC (if testing Web3 Superfluid streams natively)
+
+### Setup
 
 ```bash
-# Install dependencies
+# 1. Clone & Install dependencies
 npm install
 
-# Set up environment
+# 2. Configure environment
 cp ENV_TEMPLATE.txt .env
-# Edit .env with your configuration
+# Open .env and insert your MongoDB URI, RPC URL, and JWT Secrets
 
-# Start MongoDB
+# 3. Start MongoDB (if running locally)
 mongod
 
-# Start the server
+# 4. Start the development server
 npm run dev
 ```
 
-## API Endpoints
+Server defaults to `http://localhost:5000`
+
+## 📚 API Endpoints Overview
+
+The complete Swagger endpoint documentation can be explored by running the app and visiting **`/api/docs`**.
+
+### Core Services
 
 | Method | Endpoint                      | Description                    |
 |--------|-------------------------------|--------------------------------|
-| POST   | `/api/users`                  | Create user                    |
-| POST   | `/api/users/login`            | User login                     |
-| GET    | `/api/users/:id`              | Get user profile               |
-| POST   | `/api/stores`                 | Create store                   |
-| POST   | `/api/stores/login`           | Store login                    |
-| GET    | `/api/stores/:id/clients`     | Get store clients (users)      |
-| POST   | `/api/sessions/start`         | Start streaming session        |
-| POST   | `/api/sessions/:id/end`       | End streaming session          |
-| POST   | `/api/sessions/:id/bill`      | Process session billing        |
-| GET    | `/api/wallets/:id/balance`    | Get wallet balance             |
-| POST   | `/api/wallets/:id/topup`      | Top up wallet                  |
+| POST   | `/api/users/login`            | Authenticate a user            |
+| POST   | `/api/stores/login`           | Authenticate a store merchant  |
+| POST   | `/api/sessions/start`         | Start a streaming session      |
+| POST   | `/api/sessions/:id/end`       | Terminate a streaming session  |
+| POST   | `/api/sessions/:id/bill`      | Resolve billing / Ledger sync  |
+| GET    | `/api/wallets/:id/balance`    | Fetch wallet balance details   |
+| POST   | `/api/wallets/:id/topup`      | Load funds into a wallet       |
 
-## Data Models
+### Example: Starting a Stream 
 
-### UserAccount
-- `fullName`, `email`, `phone`, `passwordHash`
-- `walletId` - Reference to user's wallet
-- `storeIds[]` - Array of stores the user has used
-- `status` - ACTIVE | BLOCKED
-- `kycLevel` - BASIC | VERIFIED
-
-### StoreAccount
-- `storeName`, `ownerName`, `email`, `phone`
-- `walletId` - Reference to store's wallet
-- `storeType` - GYM | EV | WIFI | PARKING
-- `location` - { address, lat, lng }
-- `verificationStatus` - PENDING | VERIFIED | REJECTED
-
-### StreamSession
-- `userWalletId`, `storeWalletId`, `serviceId`
-- `ratePerSecond`, `startedAt`, `lastBilledAt`
-- `status` - ACTIVE | PAUSED | ENDED
-- `totalAmountTransferred`, `totalDurationSeconds`
-
-## Starting a Session
-
+To begin streaming money for a service (e.g., parking your car):
 ```bash
 curl -X POST http://localhost:5000/api/sessions/start \
   -H "Content-Type: application/json" \
@@ -85,19 +86,17 @@ curl -X POST http://localhost:5000/api/sessions/start \
     "storeId": "store_id_here"
   }'
 ```
+This triggers the engine to:
+1. Verify the User has sufficient funds.
+2. Initialize the `StreamSession` entity and mark it `ACTIVE`.
+3. Auto-link the Store to the User's `storeIds` for historical tracking.
+4. Execute the blockchain transactions to open a Superfluid stream from the Payer to the Receiver.
 
-This will:
-1. Validate user wallet and balance
-2. Create a streaming session
-3. Add the store to user's `storeIds` array
-4. Start Superfluid flow (if crypto-enabled)
+## 📖 Further Documentation
 
-## Documentation
-
-- **API Docs**: `http://localhost:5000/api/docs`
-- **Health Check**: `http://localhost:5000/health`
-
-## Environment Variables
+- **Superfluid Context**: Review [`README_SUPERFLUID.md`](./README_SUPERFLUID.md) for how Web3 streams are managed.
+- **Database Schema**: Review [`Schema_Relation.md`](./Schema_Relation.md) for data entity relations.
+- **Health Check**: Run a quick system diagnostic at `GET /health`
 
 | Variable           | Description                     | Default                              |
 |--------------------|---------------------------------|--------------------------------------|
